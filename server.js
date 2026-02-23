@@ -4,8 +4,11 @@ import Replicate from "replicate";
 
 const app = express();
 
+// 1. Enable CORS for WordPress communication
 app.use(cors());
-app.use(express.json());
+
+// 2. Expand capacity to handle large image data
+app.use(express.json({ limit: '50mb' }));
 
 const replicate = new Replicate({
   auth: process.env.REPLICATE_API_TOKEN,
@@ -33,7 +36,6 @@ app.post("/generate", async (req, res) => {
     );
 
     const imageUrl = Array.isArray(output) ? output[0] : output;
-
     res.json({ image: imageUrl });
 
   } catch (error) {
