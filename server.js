@@ -6,7 +6,7 @@ import Replicate from "replicate";
 dotenv.config();
 
 const app = express();
-app.use(express.json({ limit: "20mb" }));
+app.use(express.json({ limit: "25mb" }));
 app.use(cors());
 
 const replicate = new Replicate({
@@ -18,7 +18,6 @@ app.get("/", (req, res) => {
   res.json({ status: "Forge server online" });
 });
 
-// Generate route
 app.post("/generate", async (req, res) => {
   try {
     const authHeader = req.headers["x-sensi-key"];
@@ -26,7 +25,7 @@ app.post("/generate", async (req, res) => {
     if (authHeader !== process.env.SENSI_FORGE_SHARED_SECRET) {
       return res.status(403).json({
         success: false,
-        message: "Unauthorized Forge Access",
+        message: "Unauthorized Forge Access"
       });
     }
 
@@ -35,48 +34,49 @@ app.post("/generate", async (req, res) => {
     if (!faceImage) {
       return res.status(400).json({
         success: false,
-        message: "Missing face image",
+        message: "Missing face image"
       });
     }
 
-    // Split image
-    const splitOutput = await replicate.run(
-      "tgohblio/instant-id-multicontrolnet:35324a7df2397e6e57dfd8f4f9d2910425f5123109c8c3ed035e769aeff9ff3c",
-      {
-        input: {
-          prompt: `${hero} cinematic dual identity hero split`,
-          face_image_path: faceImage,
-          pose_strength: 0.8,
-          identity_strength: 0.85,
-          negative_prompt: "ugly, deformed face, blurry, watermark",
-        },
-      }
-    );
+    console.log("Forge Request:", hero, tier);
 
-    // Full image
-    const fullOutput = await replicate.run(
-      "tgohblio/instant-id-multicontrolnet:35324a7df2397e6e57dfd8f4f9d2910425f5123109c8c3ed035e769aeff9ff3c",
-      {
-        input: {
-          prompt: `${hero} full cinematic heroic masterpiece`,
-          face_image_path: faceImage,
-          pose_strength: 0.8,
-          identity_strength: 0.85,
-          negative_prompt: "ugly, deformed face, blurry, watermark",
-        },
-      }
-    );
+    const model =
+      "tgohblio/instant-id-multicontrolnet:35324a7df2397e6e57dfd8f4f9d2910425f5123109c8c3ed035e769aeff9ff3c";
 
-    res.json({
-      success: true,
-      image_split: Array.isArray(splitOutput) ? splitOutput[0] : splitOutput,
-      image_full: Array.isArray(fullOutput) ? fullOutput[0] : fullOutput,
+    const splitOutput = await replicate.run(model, {
+      input: {
+        prompt: `${hero} cinematic dual identity hero split, ultra detailed, masterpiece`,
+        face_image_path: faceImage,
+        pose_strength: 0.8,
+        identity_strength: 0.85,
+        negative_prompt: "ugly, blurry, deformed, watermark"
+      }
     });
+
+    const fullOutput = await replicate.run(model, {
+      input: {
+        prompt: `${hero} full cinematic heroic portrait, ultra detailed, masterpiece`,
+        face_image_path: faceImage,
+        pose_strength: 0.8,
+        identity_strength: 0.85,
+        negative_prompt: "ugly, blurry, deformed, watermark"
+      }
+    });
+
+    const splitUrl = Array.isArray(splitOutput) ? splitOutput[0] : splitOutput;
+    const fullUrl  = Array.isArray(fullOutput)  ? fullOutput[0]  : fullOutput;
+
+    return res.json({
+      success: true,
+      image_split: splitUrl,
+      image_full: fullUrl
+    });
+
   } catch (error) {
     console.error("Forge Error:", error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
-      message: "Generation failed",
+      message: "Generation failed"
     });
   }
 });
