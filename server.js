@@ -1,87 +1,123 @@
+import "dotenv/config";
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
+import fs from "fs";
+import path from "path";
 import Replicate from "replicate";
+import { fileURLToPath } from "url";
 
-dotenv.config();
+// Resolve __dirname in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
+// Initialize app
 const app = express();
-app.use(express.json({ limit: "25mb" }));
 app.use(cors());
+app.use(express.json({ limit: "20mb" }));
 
+// Uploads directory
+const uploadsDir = path.join(__dirname, "uploads");
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir);
+}
+
+// Replicate client
 const replicate = new Replicate({
-  auth: process.env.REPLICATE_API_TOKEN,
+  auth: process.env.REPLICATE_API_TOKEN
 });
 
 // Health check
-app.get("/", (req, res) => {
-  res.json({ status: "Forge server online" });
+app.get("/health", (req, res) => {
+  res.json({
+    success: true,
+    service: "hero-forge-api-1",
+    model: "flux-1.1-pro",
+    timestamp: Date.now()
+  });
 });
 
-app.post("/generate", async (req, res) => {
+/* ============================================
+   HERO-FORGE: Main Ascension Generator
+============================================ */
+
+app.post("/hero-forge", async (req, res) => {
   try {
-    const authHeader = req.headers["x-sensi-key"];
+    const { image, form, tier, city, energy } = req.body || {};
 
-    if (authHeader !== process.env.SENSI_FORGE_SHARED_SECRET) {
-      return res.status(403).json({
-        success: false,
-        message: "Unauthorized Forge Access"
-      });
-    }
-
-    const { faceImage, hero, tier } = req.body;
-
-    if (!faceImage) {
+    // Validate
+    if (!image) {
       return res.status(400).json({
         success: false,
-        message: "Missing face image"
+        error: "Missing base64 image."
       });
     }
 
-    console.log("Forge Request:", hero, tier);
+    if (!form) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing form (e.g., aether_phoenix)."
+      });
+    }
 
-    const model =
-      "tgohblio/instant-id-multicontrolnet:35324a7df2397e6e57dfd8f4f9d2910425f5123109c8c3ed035e769aeff9ff3c";
+    // Decode base64 → file
+    const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
+    const buffer = Buffer.from(base64Data, "base64");
 
-    const splitOutput = await replicate.run(model, {
-      input: {
-        prompt: `${hero} cinematic dual identity hero split, ultra detailed, masterpiece`,
-        face_image_path: faceImage,
-        pose_strength: 0.8,
-        identity_strength: 0.85,
-        negative_prompt: "ugly, blurry, deformed, watermark"
+    const filename = `hero-${Date.now()}-${Math.round(Math.random() * 1e9)}.jpg`;
+    const inputPath = path.join(uploadsDir, filename);
+
+    fs.writeFileSync(inputPath, buffer);
+
+    // Build prompt
+    const prompt = `
+Transform this selfie into a transcendent heroic form.
+Form: ${form}.
+Tier: ${tier || "ascension"}.
+Energy: ${energy || "white-gold"}.
+City Influence: ${city || "none"}.
+
+Rules:
+- Preserve exact facial identity, bone structure, and skin tone.
+- No distortions, no extra faces.
+- Cinematic lighting, mythic detail, 8k clarity.
+- No text, no watermarks.
+`.trim();
+
+    // Run Flux
+    const output = await replicate.run(
+      "black-forest-labs/flux-1.1-pro",
+      {
+        input: {
+          prompt,
+          image: inputPath,
+          guidance: 3.5,
+          megapixels: "1"
+        }
       }
-    });
+    );
 
-    const fullOutput = await replicate.run(model, {
-      input: {
-        prompt: `${hero} full cinematic heroic portrait, ultra detailed, masterpiece`,
-        face_image_path: faceImage,
-        pose_strength: 0.8,
-        identity_strength: 0.85,
-        negative_prompt: "ugly, blurry, deformed, watermark"
-      }
-    });
-
-    const splitUrl = Array.isArray(splitOutput) ? splitOutput[0] : splitOutput;
-    const fullUrl  = Array.isArray(fullOutput)  ? fullOutput[0]  : fullOutput;
+    const finalImage = Array.isArray(output) ? output[0] : output;
 
     return res.json({
       success: true,
-      image_split: splitUrl,
-      image_full: fullUrl
+      image: finalImage
     });
 
   } catch (error) {
-    console.error("Forge Error:", error);
+    console.error("Hero-Forge generation failed:", error);
     return res.status(500).json({
       success: false,
-      message: "Generation failed"
+      error: "Hero-Forge generation failed."
     });
   }
 });
 
+/* ============================================
+   START SERVER
+============================================ */
+
 const PORT = process.env.PORT || 3000;
+
 app.listen(PORT, () => {
-  console.log(`Forge active on port ${PORT}`);
+  console.log(`Hero-Forge-API-1 running on port ${PORT}`);
 });
