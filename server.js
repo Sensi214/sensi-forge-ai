@@ -54,35 +54,24 @@ app.post("/hero-forge", async (req, res) => {
     if (!form) {
       return res.status(400).json({
         success: false,
-        error: "Missing form (e.g., aether_phoenix)."
+        error: "Missing form."
       });
     }
 
-    // ✅ TEMP RESPONSE (so server doesn't crash)
-    return res.json({
-      success: true,
-      message: "Route working"
-    });
-
-  } catch (err) {
-    console.error("hero-forge error:", err);
-
-    return res.status(500).json({
-      success: false,
-      error: "Server error"
-    });
-  }
-});
-    // Decode base64 → file
+    // =================================
+    // 🧠 SAVE IMAGE
+    // =================================
     const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
     const buffer = Buffer.from(base64Data, "base64");
 
-    const filename = `hero-${Date.now()}-${Math.round(Math.random() * 1e9)}.jpg`;
+    const filename = `hero-${Date.now()}.jpg`;
     const inputPath = path.join(uploadsDir, filename);
 
     fs.writeFileSync(inputPath, buffer);
 
-    // Build prompt
+    // =================================
+    // 🧠 PROMPT
+    // =================================
     const prompt = `
 Transform this selfie into a transcendent heroic form.
 Form: ${form}.
@@ -90,14 +79,21 @@ Tier: ${tier || "ascension"}.
 Energy: ${energy || "white-gold"}.
 City Influence: ${city || "none"}.
 
-Rules:
-- Preserve exact facial identity, bone structure, and skin tone.
-- No distortions, no extra faces.
-- Cinematic lighting, mythic detail, 8k clarity.
-- No text, no watermarks.
+IDENTITY LOCK:
+- SAME face
+- SAME bone structure
+- SAME skin tone
+
+STRICT:
+- no extra people
+- no distortion
+- cinematic lighting
+- ultra realistic
 `.trim();
 
-    // Run Flux
+    // =================================
+    // 🚀 GENERATE IMAGE
+    // =================================
     const output = await replicate.run(
       "black-forest-labs/flux-1.1-pro",
       {
@@ -112,6 +108,9 @@ Rules:
 
     const finalImage = Array.isArray(output) ? output[0] : output;
 
+    // =================================
+    // ✅ RESPONSE
+    // =================================
     return res.json({
       success: true,
       image: finalImage
@@ -119,19 +118,15 @@ Rules:
 
   } catch (error) {
     console.error("Hero-Forge generation failed:", error);
+
     return res.status(500).json({
       success: false,
       error: "Hero-Forge generation failed."
     });
   }
 });
-
-/* ============================================
-   START SERVER
-============================================ */
-
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-  console.log(`Hero-Forge-API-1 running on port ${PORT}`);
+  console.log(`🚀 Hero-Forge-API-1 running on port ${PORT}`);
 });
