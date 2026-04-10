@@ -44,7 +44,6 @@ app.post("/hero-forge", async (req, res) => {
   try {
     const { image, form, tier, city, energy } = req.body || {};
 
-    // Validate
     if (!image) {
       return res.status(400).json({
         success: false,
@@ -59,6 +58,21 @@ app.post("/hero-forge", async (req, res) => {
       });
     }
 
+    // ✅ TEMP RESPONSE (so server doesn't crash)
+    return res.json({
+      success: true,
+      message: "Route working"
+    });
+
+  } catch (err) {
+    console.error("hero-forge error:", err);
+
+    return res.status(500).json({
+      success: false,
+      error: "Server error"
+    });
+  }
+});
     // Decode base64 → file
     const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
     const buffer = Buffer.from(base64Data, "base64");
